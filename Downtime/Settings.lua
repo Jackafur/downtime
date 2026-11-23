@@ -44,6 +44,14 @@ local function rowDefault(key)
 	for _, r in ipairs(ns.rows) do
 		if r.key == key then return r.default end
 	end
+	-- Another class's row (LockMenu's settings are copied on whichever character logs in first): its default is in Data.lua.
+	local class, label = key:match("^(%u+):(.+)$")
+	local section = class and Data.classes[class]
+	if section then
+		for _, row in ipairs(section.rows) do
+			if row.label == label then return row.default ~= false end
+		end
+	end
 	return true
 end
 
@@ -105,9 +113,11 @@ local function clean(s)
 end
 
 -- Downtime was LockMenu, which kept its settings in an account macro, "LockMenu data", because the Forever beta never read
--- saved files back. On the first login with Downtime they are copied over once. The macro is left alone, so going back to
--- LockMenu keeps them too.
-local OLD_MACRO = "LockMenu data"
+-- saved files back, and a second copy in a setting of its own, LockMenucfg (for when the macro could not be made, say with every
+-- macro slot full). On the first login with Downtime they are copied over once. Both are left alone, so going back to LockMenu
+-- keeps them too.
+local OLD_MACRO, OLD_CVAR = "LockMenu data", "LockMenucfg"
+local MACRO_TRIES = 5 -- macro updates to wait for the macro before giving up for this session
 local OLD_ROWS = { "Demons", "Buffs", "Utility", "Stones", "Curses", "Control", "Use", "Extra" } -- LockMenu's bit order
 local OLD_FIELDS = { h = "hold", l = "release", c = "close", m = "cursor", s = "size", b = "bg", a = "alpha", x = "extra" }
 
@@ -118,6 +128,31 @@ local function readOldMacro()
 	local ok2, body = pcall(GetMacroBody, index)
 	if not ok2 or type(body) ~= "string" then return nil end
 	return (body:gsub("^#[^\n]*\n", ""):match("^%s*(.-)%s*$"))
+end
+
+-- LockMenu's second copy. It is registered first, as LockMenu did (with ""), so the game hands back the value it kept; only
+-- with LockMenu installed, so nobody else gets that setting.
+local function readOldCVar()
+	local exists = C_AddOns and C_AddOns.DoesAddOnExist
+	if exists then
+		local ok, yes = pcall(exists, "LockMenu")
+		if ok and not yes then return nil end
+	end
+	local get = (C_CVar and C_CVar.GetCVar) or GetCVar
+	if not get then return nil end
+	local register = (C_CVar and C_CVar.RegisterCVar) or RegisterCVar
+	if register then pcall(register, OLD_CVAR, "") end
+	local ok, value = pcall(get, OLD_CVAR)
+	if not ok or type(value) ~= "string" then return nil end
+	value = value:match("^%s*(.-)%s*$")
+	if value ~= "" then return value end
+end
+
+-- Are the account macros in yet? (LockMenu's macro is one of them. At login they arrive a little after the first events.)
+local function accountMacrosIn()
+	if not GetNumMacros then return false end
+	local ok, account = pcall(GetNumMacros)
+	return ok and type(account) == "number" and account > 0
 end
 
 local function copyOld(body)
@@ -149,10 +184,15 @@ local function copyOld(body)
 end
 
 local loader = CreateFrame("Frame")
-for _, e in ipairs({ "ADDON_LOADED", "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "UPDATE_MACROS" }) do
+local LOOK_EVENTS = { "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "UPDATE_MACROS" }
+pcall(loader.RegisterEvent, loader, "ADDON_LOADED")
+for _, e in ipairs(LOOK_EVENTS) do
 	pcall(loader.RegisterEvent, loader, e)
 end
-local loaded, copied = false, false
+local loaded, macroUpdates = false, 0
+local function stopLooking()
+	for _, e in ipairs(LOOK_EVENTS) do pcall(loader.UnregisterEvent, loader, e) end
+end
 loader:SetScript("OnEvent", function(_, event, name)
 	if event == "ADDON_LOADED" then
 		if name ~= ADDON then return end
@@ -164,19 +204,26 @@ loader:SetScript("OnEvent", function(_, event, name)
 		end
 		return
 	end
-	if not loaded or copied then return end
-	-- No saved file yet: look for LockMenu's macro once the macros are there (they load around login).
+	if not loaded then return end
 	if saved and saved.settingsVersion then
-		copied = true
+		stopLooking()
 		return
 	end
+	-- No saved file yet: look for LockMenu's macro, at every macro update until the account macros are in. When they are
+	-- and the macro is not among them, or after a few updates, LockMenu's second copy is read instead.
 	local body = readOldMacro()
+	if not body and event == "UPDATE_MACROS" then
+		macroUpdates = macroUpdates + 1
+		if accountMacrosIn() or macroUpdates >= MACRO_TRIES then body = readOldCVar() end
+		if not body and macroUpdates >= MACRO_TRIES then
+			stopLooking()
+			return
+		end
+	end
 	if body then
-		copied = true
+		stopLooking()
 		copyOld(body)
 		print("Downtime: your LockMenu settings were copied over")
 		fire("all")
-	elseif event == "UPDATE_MACROS" then
-		copied = true
 	end
 end)

@@ -2,7 +2,7 @@
 ## Title: Downtime
 ## Notes: One menu on one key for between fights: your class's spells, camp items, hearths and profession windows. Was LockMenu.
 ## Author: Jackafur
-## Version: 0.5.0
+## Version: 0.5.1
 ## IconTexture: Interface\AddOns\Downtime\icon.tga
 ## SavedVariables: DowntimeDB
 

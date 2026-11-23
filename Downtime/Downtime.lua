@@ -12,6 +12,19 @@ local buttons, labels = {}, {}
 local shardText
 local holdToken = 0
 local keyBtn, armRelease, clearRelease -- the key's secure button and the two functions that load a spell onto it (see below)
+local closeAfterFight, toldInFight = false, false
+
+-- The menu holds secure buttons, so the game counts it as a protected frame: in a fight no addon may show, hide or move it.
+-- Downtime is for between fights, so it never tries: in a fight the key does not open the menu, the menu closes as a fight
+-- starts (the game still allows that then), and a close asked for in a fight waits for the fight's end.
+local function closeMenu()
+	if not (menu and menu:IsShown()) then return end
+	if InCombatLockdown() then
+		closeAfterFight = true
+		return
+	end
+	menu:Hide()
+end
 
 local function secret(v)
 	return issecretvalue and issecretvalue(v) or false
@@ -138,8 +151,8 @@ local function newButton(index)
 		GameTooltip:Hide()
 		if clearRelease then clearRelease() end
 	end)
-	-- After a cast the menu closes, if that is switched on. Hiding an ordinary frame is allowed in combat too.
-	b:SetScript("PostClick", function() if menu and DB.close then menu:Hide() end end)
+	-- After a cast the menu closes, if that is switched on (in a fight: after it, see closeMenu).
+	b:SetScript("PostClick", function() if DB.close then closeMenu() end end)
 	return b
 end
 
@@ -359,32 +372,46 @@ local function createMenu()
 	menu.empty:SetPoint("TOPLEFT", PAD, -(HEADER_H + PAD))
 	menu.empty:SetText("Nothing to show. Check /downtime options")
 	menu.empty:Hide()
-	menu:SetScript("OnShow", updateButtons)
+	-- Esc closes the menu through a stand-in frame that is shown while the menu is: the game's Esc hides every frame on its
+	-- list, in a fight too, and the menu itself must not be hidden in a fight (see closeMenu).
+	local escape = CreateFrame("Frame", "DowntimeEscape", UIParent)
+	escape:Hide()
+	escape:SetScript("OnHide", closeMenu)
+	table.insert(UISpecialFrames, "DowntimeEscape")
+	menu:SetScript("OnShow", function()
+		escape:Show()
+		updateButtons()
+	end)
+	menu:SetScript("OnHide", function() escape:Hide() end)
 	menu:Hide()
-	table.insert(UISpecialFrames, "DowntimeFrame")
 	applyLook()
 end
 
--- Opens the menu. The menu itself is an ordinary frame, so it can be opened and closed in combat; what it shows is only
--- rebuilt out of combat, and it is only moved out of combat (in combat it opens where it was).
+-- Opens the menu where it is set to open, out of a fight only (see closeMenu). In a fight one chat line says so, once a fight.
 local function open()
-	if not InCombatLockdown() then
-		if dirty then rebuild() end
-		menu:ClearAllPoints()
-		if DB.cursor then
-			local x, y = GetCursorPosition()
-			local scale = UIParent:GetEffectiveScale()
-			menu:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale, y / scale)
-		else
-			menu:SetPoint("CENTER", UIParent, "CENTER", 0, -80)
+	if InCombatLockdown() then
+		if not toldInFight then
+			toldInFight = true
+			print("Downtime: the menu opens after the fight")
 		end
+		return
+	end
+	if dirty then rebuild() end
+	closeAfterFight = false
+	menu:ClearAllPoints()
+	if DB.cursor then
+		local x, y = GetCursorPosition()
+		local scale = UIParent:GetEffectiveScale()
+		menu:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale, y / scale)
+	else
+		menu:SetPoint("CENTER", UIParent, "CENTER", 0, -80)
 	end
 	menu:Show()
 end
 
 function Downtime_Toggle()
 	if not menu then return end
-	if menu:IsShown() then menu:Hide() else open() end
+	if menu:IsShown() then closeMenu() else open() end
 end
 
 -- The key is a secure button that the key binding clicks when the key goes down and again when it comes up. In toggle mode
@@ -393,8 +420,8 @@ end
 --
 -- Cast on release: while the menu is open, pointing at a spell copies that spell onto this button's attributes, and the
 -- release click then casts it through the game's own secure code. (An addon cannot cast by itself, and the snippets other
--- addons use for this do not work in this client.) The attributes of a secure button can only be changed out of combat, so in
--- combat the release only closes the menu, and a spell has to be clicked.
+-- addons use for this do not work in this client.) The attributes of a secure button can only be changed out of combat, and
+-- they are cleared as a fight starts, so a release in a fight casts nothing.
 keyBtn = CreateFrame("Button", "DowntimeKey", UIParent, "SecureActionButtonTemplate")
 keyBtn:RegisterForClicks("AnyDown", "AnyUp")
 keyBtn:SetAttribute("useOnKeyDown", false) -- a spell loaded on it is cast when the key comes up
@@ -424,7 +451,7 @@ keyBtn:SetScript("PreClick", function(_, _, down)
 			local token = holdToken
 			if C_Timer and C_Timer.After then
 				C_Timer.After(90, function()
-					if holdToken == token and menu:IsShown() then menu:Hide() end
+					if holdToken == token then closeMenu() end
 				end)
 			end
 		end
@@ -436,7 +463,7 @@ end)
 keyBtn:SetScript("PostClick", function(_, _, down)
 	if DB.hold and not down then
 		holdToken = holdToken + 1
-		menu:Hide()
+		closeMenu()
 		clearRelease()
 	end
 end)
@@ -468,34 +495,63 @@ ns.OnChange(function(key)
 end)
 ns.Rebuild = function() dirty = true rebuild() end
 
--- Downtime was LockMenu. If both are installed, LockMenu is switched off from the next reload (its settings were copied over),
--- and LockMenu's key opens Downtime from now on, unless Downtime already has a key of its own.
+-- Downtime was LockMenu. LockMenu's key opens Downtime from now on, unless Downtime already has a key. The keys live in one of
+-- two sets, the account's or the character's own, and a character sees and saves only the set it uses, so each set moves its
+-- key on the first login of a character that uses it, with LockMenu switched on or off. The game loads the keys a little
+-- after login (BINDINGS_LOADED), and keys only change out of a fight, so the move waits for both. LockMenu is switched off
+-- (for every character, from the next reload) only once this character's set is done: its key moved, or no key to move.
 local OLD_BINDING, BINDING = "CLICK LockMenuKey:LeftButton", "CLICK DowntimeKey:LeftButton"
+local keysLoaded, loggedIn, keysDone = false, false, false
+
+-- Returns true once this character's key set is done, false to try again on a later event.
 local function takeOverLockMenuKey()
-	if InCombatLockdown() or not (GetBindingKey and SetBinding and SaveBindings) then return end
-	if GetBindingKey(BINDING) then return end
+	if not (GetBindingKey and SetBinding and SaveBindings) then return true end
 	local keys = { GetBindingKey(OLD_BINDING) }
-	if #keys == 0 then return end
+	local own = GetBindingKey(BINDING)
+	if own then return true end
+	-- Before the keys are loaded nothing is bound, so "no LockMenu key" only counts once they are.
+	if #keys == 0 then return keysLoaded end
+	if InCombatLockdown() then return false end
 	for _, key in ipairs(keys) do SetBinding(key, BINDING) end
 	SaveBindings(GetCurrentBindingSet and GetCurrentBindingSet() or 1)
 	print("Downtime: your LockMenu key (" .. table.concat(keys, ", ") .. ") opens Downtime now")
+	return true
 end
 
+-- Switches LockMenu off for every character and saves that at once, because closing the game's AddOns list with Cancel puts
+-- back whatever was not saved.
 local function retireLockMenu()
 	local isLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
 	local disable = (C_AddOns and C_AddOns.DisableAddOn) or DisableAddOn
+	local save = (C_AddOns and C_AddOns.SaveAddOns) or SaveAddOns
 	if not (isLoaded and disable) then return end
 	local ok, loaded = pcall(isLoaded, "LockMenu")
-	if ok and loaded then
-		pcall(takeOverLockMenuKey)
-		pcall(disable, "LockMenu")
-		print("Downtime: LockMenu is now Downtime, so LockMenu is switched off from your next reload. You can delete its folder.")
-	end
+	if not (ok and loaded) then return end
+	pcall(disable, "LockMenu")
+	if save then pcall(save) end
+	print("Downtime: LockMenu is now Downtime, so LockMenu is switched off from your next reload. You can delete its folder.")
 end
 
+local lockMenuKey = CreateFrame("Frame")
+for _, e in ipairs({ "PLAYER_LOGIN", "BINDINGS_LOADED", "UPDATE_BINDINGS", "PLAYER_REGEN_ENABLED" }) do
+	pcall(lockMenuKey.RegisterEvent, lockMenuKey, e)
+end
+lockMenuKey:SetScript("OnEvent", function(self, event)
+	if event == "BINDINGS_LOADED" or event == "UPDATE_BINDINGS" then keysLoaded = true end
+	if event == "PLAYER_LOGIN" then loggedIn = true end
+	if keysDone or not loggedIn then return end
+	local ok, done = pcall(takeOverLockMenuKey)
+	-- (Saving the keys can send UPDATE_BINDINGS straight back here, which may already have finished.)
+	if keysDone or (ok and not done) then return end
+	keysDone = true
+	self:UnregisterAllEvents()
+	-- An error leaves LockMenu as it is, for the next login to try again.
+	if ok then retireLockMenu() end
+end)
+
 local events = CreateFrame("Frame")
-for _, e in ipairs({ "PLAYER_LOGIN", "SPELLS_CHANGED", "LEARNED_SPELL_IN_TAB", "PLAYER_REGEN_ENABLED", "BAG_UPDATE_DELAYED",
-	"SPELL_UPDATE_COOLDOWN", "BAG_UPDATE_COOLDOWN", "PLAYER_EQUIPMENT_CHANGED" }) do
+for _, e in ipairs({ "PLAYER_LOGIN", "SPELLS_CHANGED", "LEARNED_SPELL_IN_TAB", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED",
+	"BAG_UPDATE_DELAYED", "SPELL_UPDATE_COOLDOWN", "BAG_UPDATE_COOLDOWN", "PLAYER_EQUIPMENT_CHANGED" }) do
 	pcall(events.RegisterEvent, events, e)
 end
 local pendingBags = false
@@ -517,10 +573,20 @@ events:SetScript("OnEvent", function(_, event, slot)
 			dirty = true
 			if menu:IsShown() and not InCombatLockdown() then rebuild() end
 		end
+	elseif event == "PLAYER_REGEN_DISABLED" then
+		-- A fight starts: the game still lets an addon close the menu now, and then not until the fight is over. A spell
+		-- loaded for cast on release is let go too.
+		holdToken = holdToken + 1
+		clearRelease()
+		closeMenu()
 	elseif event == "PLAYER_REGEN_ENABLED" then
+		toldInFight = false
+		if closeAfterFight then
+			closeAfterFight = false
+			closeMenu()
+		end
 		if dirty then rebuild() end
 	else
-		if event == "PLAYER_LOGIN" then retireLockMenu() end
 		dirty = true
 		if not InCombatLockdown() then rebuild() end
 	end

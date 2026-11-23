@@ -39,14 +39,14 @@ Then the rows every character gets:
 
 Press the key to open the menu. `/downtime` or `/dt` does the same.
 
-**Coming from LockMenu:** the first time Downtime loads, your LockMenu settings are copied over, your LockMenu key opens Downtime from then on, and LockMenu is switched off. Delete the `LockMenu` folder from your AddOns.
+**Coming from LockMenu:** the first time Downtime loads, your LockMenu settings are copied over, your LockMenu key opens Downtime from then on, and LockMenu is switched off. A character with its own key bindings gets its LockMenu key moved the first time it logs in. Delete the `LockMenu` folder from your AddOns.
 
 ## Options
 
 Type `/downtime options`.
 
 - **Hold to show:** the menu opens while you hold the key and closes when you let go, instead of toggling.
-- **Cast on release:** with hold to show, letting go casts the spell the mouse is pointing at. This only works out of combat, because the game only lets a secure button change its spell out of combat. In combat, hold the key and click the spell instead.
+- **Cast on release:** with hold to show, letting go casts the spell the mouse is pointing at.
 - **Close after casting**, and whether it **opens at the mouse** or near the middle of the screen.
 - **Which rows show:** your class's rows, then the rows every character gets. The warlock's Curses and Control rows and the paladin's Auras start switched off.
 - **Button size, background opacity and menu opacity.**
@@ -69,8 +69,7 @@ Edit `Data.lua`. Each class has its rows. Spells are matched by name against you
 
 ## Limits
 
-- The menu is an ordinary frame, so it opens and closes in combat. What it shows is only redrawn out of combat, and it opens at the mouse only out of combat (in combat it opens where it was).
-- Cast on release does not work in combat (see above).
+- The menu is for between fights. It does not open in a fight, and an open menu closes when a fight starts, because the game does not let an addon show or hide a menu of spell buttons in a fight.
 - It is early. It was built with AI assistance (Claude Code) and tested in game by the author on one setup, so expect rough edges. Bug reports are welcome under Issues.
 
 ## Credits
