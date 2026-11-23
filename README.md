@@ -1,44 +1,71 @@
-# LockMenu
+# Downtime
 
-<img src="assets/icon-512.png" alt="LockMenu icon" width="128" align="right">
+<img src="assets/icon-512.png" alt="Downtime icon" width="128" align="right">
 
-A warlock menu on one key for the WoW Forever beta (Classic+). Press a key and a menu opens at your mouse with the spells you would otherwise need keybinds for: your demons, buffs, stones and utility spells, plus the healthstone, soulstone and sleeping bag you are carrying. Click one to cast it.
+One menu on one key for everything you do between fights, on every character, for WoW Forever. Press the key and a menu opens at your mouse: your class's own spells for between fights, the camp items and hearths you carry, and your profession windows. Click one to use it.
 
-It reads your spellbook and only shows spells you know, so it works with the beta's own warlock spell list. There is no Felguard, Fel Armor or Ritual of Souls on the beta, but Incubus is there, and a spell the beta lacks is simply not shown.
+Downtime was LockMenu, a warlock menu. The warlock menu is still here, unchanged, as the warlock's rows.
+
+It reads your spellbook and your bags, so it only shows what that character knows and carries.
+
+## What the menu shows
+
+Your class's rows come first:
+
+| Class | Rows |
+|---|---|
+| Warlock | Demons, Buffs, Utility, Stones, Curses and banes, Control, and the healthstone and soulstone you carry (LockMenu's menu) |
+| Rogue | Main hand and Off hand: each poison you carry, one click puts it on that hand. The off hand row shows while you hold an off-hand weapon. |
+| Paladin | Blessings, Greater blessings, Auras, Utility (redemption) |
+| Mage | Conjure (water, food, mana gems), Buffs, Teleports, Portals |
+| Priest | Buffs (fortitude, spirit, shadow protection, inner fire), Utility (resurrection, levitate, mind vision) |
+| Druid | Buffs (mark of the wild, thorns), Utility (rebirth) |
+| Shaman | Weapon enchants, Utility (shields, water walking and breathing, ancestral spirit, far sight) |
+| Hunter | Pet (call, dismiss, revive, mend, feed, tame, train) |
+| Warrior | No rows of its own |
+
+Then the rows every character gets:
+
+- **Camp:** the campfire kit you carry (the best one), the camp objects you carry (Fish Bowl, Enchanted Lute, Camp Tent and the rest) and the Cozy Sleeping Bag.
+- **Hearths:** your Hearthstone, the engineering teleports, Astral Recall and Teleport: Moonglade.
+- **Professions:** opens each profession's window, plus Disenchant and Fishing.
+- **Extra:** spells you add by name in the options.
 
 ## Install
 
-1. Download the zip from the [releases page](https://github.com/Jackafur/lockmenu/releases) and extract the `LockMenu` folder into `World of Warcraft\_forever_\Interface\AddOns`.
+1. Download the zip from the [releases page](https://github.com/Jackafur/downtime/releases) and extract the `Downtime` folder into `World of Warcraft\_forever_\Interface\AddOns`.
 2. Restart the game once. A new addon and its key binding need a full restart.
-3. Esc, Options, Keybindings, AddOns, LockMenu: bind "Show the warlock menu" to a key.
+3. Esc, Options, Keybindings, AddOns, Downtime: bind "Show the Downtime menu" to a key.
 
-Press the key to open the menu. `/lockmenu` does the same.
+Press the key to open the menu. `/downtime` or `/dt` does the same.
+
+**Coming from LockMenu:** the first time Downtime loads, your LockMenu settings are copied over, your LockMenu key opens Downtime from then on, and LockMenu is switched off. Delete the `LockMenu` folder from your AddOns.
 
 ## Options
 
-Type `/lockmenu options`.
+Type `/downtime options`.
 
 - **Hold to show:** the menu opens while you hold the key and closes when you let go, instead of toggling.
 - **Cast on release:** with hold to show, letting go casts the spell the mouse is pointing at. This only works out of combat, because the game only lets a secure button change its spell out of combat. In combat, hold the key and click the spell instead.
 - **Close after casting**, and whether it **opens at the mouse** or near the middle of the screen.
-- **Which rows show:** Demons, Buffs, Utility, Stones, Curses and banes, Control (fear, banish, howl, death coil), the stones you carry, and extra spells. Curses and Control are off by default.
+- **Which rows show:** your class's rows, then the rows every character gets. The warlock's Curses and Control rows and the paladin's Auras start switched off.
 - **Button size, background opacity and menu opacity.**
 - **Extra spells:** exact spell names, separated by commas, that appear in an Extra row.
 
-Settings are kept in an account-wide macro named "LockMenu data", because the Forever beta does not read saved variables back. Please leave that macro alone.
+Settings are saved for the whole account.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `/lockmenu` or `/lkm` | Open or close the menu |
-| `/lockmenu options` | Open the options window |
-| `/lockmenu scan` | Print what the addon found in your spellbook and how many buttons the menu has (send this with a bug report) |
-| `/lockmenu rebuild` | Redraw the menu |
+| `/downtime` or `/dt` | Open or close the menu |
+| `/downtime options` | Open the options window |
+| `/downtime scan` | Print what the addon found in your spellbook and how many buttons the menu has (send this with a bug report) |
+| `/downtime rebuild` | Redraw the menu |
 
 ## Change what is shown
 
-Edit `Data.lua`. The rows are matched by name against your spellbook, curses and banes are picked up by pattern, `extra` adds spells by exact name, and `useItems` lists the healthstone, soulstone and sleeping bag item IDs.
+Edit `Data.lua`. Each class has its rows. Spells are matched by name against your spellbook (or by a pattern like every "Curse of ...") and items by their item IDs, best first. The comment at the top of the file explains each field.
 
 ## Limits
 
@@ -48,7 +75,7 @@ Edit `Data.lua`. The rows are matched by name against your spellbook, curses and
 
 ## Credits
 
-Inspired by WarlockTools by afrugalpenguin, a popup spell menu for TBC Anniversary. LockMenu is written from scratch for the Forever beta and shares no code with it. The healthstone and soulstone item ID lists are game data, which any item database has.
+LockMenu was inspired by WarlockTools by afrugalpenguin, a popup spell menu for TBC Anniversary. Downtime is written from scratch for WoW Forever and shares no code with it. The item ID lists are game data, which any item database has.
 
 ## License
 

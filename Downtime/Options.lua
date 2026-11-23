@@ -1,6 +1,4 @@
-local ADDON, ns = ...
-
-if select(2, UnitClass("player")) ~= "WARLOCK" then return end
+local _, ns = ...
 
 local DB = ns.DB
 local panel
@@ -71,8 +69,8 @@ local function slider(y, text, key, minV, maxV, stepV, fmt)
 end
 
 local function build()
-	panel = CreateFrame("Frame", "LockMenuOptions", UIParent, "BackdropTemplate")
-	panel:SetSize(400, 690)
+	panel = CreateFrame("Frame", "DowntimeOptions", UIParent, "BackdropTemplate")
+	panel:SetSize(420, 400)
 	panel:SetPoint("CENTER")
 	panel:SetFrameStrata("DIALOG")
 	panel:SetMovable(true)
@@ -85,7 +83,7 @@ local function build()
 	panel:SetBackdropBorderColor(0.45, 0.3, 0.65, 1)
 	local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	title:SetPoint("TOP", 0, -12)
-	title:SetText("LockMenu")
+	title:SetText("Downtime")
 	local close = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
 	close:SetPoint("TOPRIGHT", 2, 2)
 
@@ -98,9 +96,16 @@ local function build()
 	check(-160, "Open the menu at the mouse (otherwise near the middle of the screen)",
 		function() return DB.cursor end, function(v) ns.Set("cursor", v) end)
 
+	-- This character's class rows first, then the rows everyone gets (the same switches on every character).
 	heading(-202, "What the menu shows")
 	local y = -224
-	for _, row in ipairs(ns.rows) do
+	for i, row in ipairs(ns.rows) do
+		if i > 1 and ns.rows[i - 1].class and not row.class then
+			local fs = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+			fs:SetPoint("TOPLEFT", 16, y - 4)
+			fs:SetText("On every character:")
+			y = y - 22
+		end
 		check(y, row.text, function() return ns.RowOn(row.key) end, function(v) ns.SetRowOn(row.key, v) end)
 		y = y - 26
 	end
@@ -119,9 +124,9 @@ local function build()
 	box:SetSize(340, 22)
 	box:SetPoint("TOPLEFT", 26, ey - 48)
 	box:SetAutoFocus(false)
-	box:SetMaxLetters(160)
+	box:SetMaxLetters(255)
 	local function commit(self)
-		local v = (self:GetText() or ""):gsub("[;=\r\n]", "")
+		local v = (self:GetText() or ""):gsub("[\r\n]", "")
 		v = v:match("^%s*(.-)%s*$")
 		if v ~= (DB.extra or "") then ns.Set("extra", v) end
 	end
@@ -134,9 +139,12 @@ local function build()
 	saved:SetPoint("BOTTOM", 0, 10)
 	saved:SetText("Changes are saved as you make them")
 
+	-- The window is as tall as what it holds (a warlock has more rows than a warrior).
+	panel:SetHeight(-(ey - 48) + 22 + 40)
+
 	panel:SetScript("OnShow", syncAll)
 	panel:Hide()
-	table.insert(UISpecialFrames, "LockMenuOptions")
+	table.insert(UISpecialFrames, "DowntimeOptions")
 end
 
 function ns.OpenOptions()
