@@ -35,7 +35,7 @@ Then the rows every character gets:
 
 1. Download the zip from the [releases page](https://github.com/Jackafur/downtime/releases) and extract the `Downtime` folder into `World of Warcraft\_forever_\Interface\AddOns`.
 2. Restart the game once. A new addon and its key binding need a full restart.
-3. Esc, Options, Keybindings, AddOns, Downtime: bind "Show the Downtime menu" to a key.
+3. Esc, Options, Keybindings, AddOns, Downtime: bind "Downtime - Menu" to a key.
 
 Press the key to open the menu. `/downtime` or `/dt` does the same.
 

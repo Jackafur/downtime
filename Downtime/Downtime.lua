@@ -1,7 +1,7 @@
 local _, ns = ...
 
 BINDING_HEADER_DOWNTIME = "Downtime"
-_G["BINDING_NAME_CLICK DowntimeKey:LeftButton"] = "Show the Downtime menu (toggle or hold, see /downtime options)"
+_G["BINDING_NAME_CLICK DowntimeKey:LeftButton"] = "Downtime - Menu (toggle or hold, see /downtime options)"
 
 local Data, DB = ns.Data, ns.DB
 local shardItem = ns.section and ns.section.shardItem -- warlocks: the soul shard count at the top
